@@ -1,12 +1,21 @@
 #!/usr/bin/python3
 import argparse
 from multidiff import MultidiffModel, StreamView, SocketController, FileController, StdinController
+import shutil
+import sys
 
-def main():
-	args = make_parser().parse_args()
+def main(args=None):
+
+	if args is None:
+		args = sys.argv[1:]
+	args = make_parser().parse_args(args)
 	m = MultidiffModel()
-	v = StreamView(m, encoding=args.outformat, mode=args.mode, color=args.color)
-	
+
+	if args.width == 'max':
+		args.width = get_max_width(args)
+
+	v = StreamView(m, encoding=args.outformat, mode=args.mode, color=args.color, width=args.width, diff=args.diff)
+
 	if len(args.file) > 0:
 		informat = args.informat if args.informat else 'raw'
 		files = FileController(m, informat)
@@ -19,6 +28,11 @@ def main():
 		informat = args.informat if args.informat else 'raw'
 		server = SocketController(('127.0.0.1', args.port), m, informat)
 		server.serve_forever()
+
+def get_max_width(args):
+	columns = int(shutil.get_terminal_size((120,30)).columns)
+	args.width = columns
+	return args.width
 
 def make_parser():
 	parser = argparse.ArgumentParser(
@@ -75,6 +89,16 @@ def make_parser():
 		const='html',
 		default='ansi',
 		help='use html for colors instead of ansi codes')
+
+	parser.add_argument('-w', '--width',
+		dest='width',
+		default='82',
+		help='number of bytes printed per line, either an integer or max(width of console)')
+
+	parser.add_argument('-d', '--diff',
+		dest='diff',
+		action='store_true',
+		help='only show addresses where bytes have changed(only for hexdump outformat)')
 	return parser
 
 if __name__ == '__main__':
